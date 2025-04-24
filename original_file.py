@@ -286,7 +286,7 @@ def analyze_excel_data(file_path):
 
 def analyze_excel_data_by_buyer(file_path):
     """
-    엑셀 파일에서 구매자별로 주문 데이터를 분석합니다.
+    엑셀 파일에서 수취인별로 주문 데이터를 분석합니다.
     """
     try:
         # 엑셀 파일 읽기
@@ -299,9 +299,9 @@ def analyze_excel_data_by_buyer(file_path):
         quantity_column_name = None
 
         for col in df.columns:
-            if "구매자" in col and "전화번호" not in col:  # '구매자' 컬럼 찾기, 단 '구매자전화번호'는 제외
+            if "수취인이름" in col:  # '구매자' -> '수취인이름'으로 변경
                 buyer_name_column = col
-            if "구매자전화번호" in col:
+            if "수취인전화번호" in col:  # '구매자전화번호' -> '수취인전화번호'로 변경
                 buyer_phone_column = col
             if "최초등록등록상품명/옵션명" in col:
                 option_column_name = col
@@ -309,7 +309,7 @@ def analyze_excel_data_by_buyer(file_path):
                 quantity_column_name = col
 
         if not buyer_phone_column:
-            print("구매자 전화번호 열을 찾을 수 없습니다.")
+            print("수취인 전화번호 열을 찾을 수 없습니다.")
             return None
 
         if not option_column_name:
@@ -322,20 +322,20 @@ def analyze_excel_data_by_buyer(file_path):
             if len(df.columns) > 22:
                 quantity_column_name = df.columns[22]
 
-        # 구매자별 상품 수량을 저장할 딕셔너리
+        # 수취인별 상품 수량을 저장할 딕셔너리
         buyer_product_counts = {}
         
-        # 구매자별로 그룹화하여 처리
+        # 수취인별로 그룹화하여 처리
         for _, row in df.iterrows():
             # 전화번호는 필수
             phone = row[buyer_phone_column]
             if pd.isna(phone):
                 continue
             
-            # 구매자명이 있으면 사용, 없으면 '고객'으로 표시
+            # 수취인명이 있으면 사용, 없으면 '고객'으로 표시
             buyer = row[buyer_name_column] if buyer_name_column and not pd.isna(row[buyer_name_column]) else '고객'
             
-            # 구매자 키 생성 (구매자명(전화번호) 형식)
+            # 수취인 키 생성 (수취인명(전화번호) 형식)
             buyer_key = f"{buyer}({phone})"
             
             if buyer_key not in buyer_product_counts:

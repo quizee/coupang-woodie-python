@@ -32,7 +32,7 @@ class CoupangAnalyzerGUI(QMainWindow):
         self.analysis_group = QButtonGroup()
         
         self.total_radio = QRadioButton("전체 상품 분석")
-        self.buyer_radio = QRadioButton("구매자별 분석")
+        self.buyer_radio = QRadioButton("수취인별 분석")
         self.total_radio.setChecked(True)  # 기본값으로 전체 상품 분석 선택
         
         self.analysis_group.addButton(self.total_radio)
