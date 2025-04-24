@@ -3,6 +3,7 @@ from collections import defaultdict
 import pandas as pd
 import os
 import sys
+from datetime import datetime
 
 def normalize_product_name(name):
     """
@@ -312,6 +313,25 @@ def process_and_display_results(product_counts, title="쿠팡 주문 분석 결�
 
     return df
 
+def save_to_excel(product_counts):
+    """
+    상품 수량을 엑셀 파일로 저장합니다.
+    """
+    # 현재 날짜를 YYYYMMDD 형식으로 가져오기
+    current_date = datetime.now().strftime("%Y%m%d")
+    
+    # 데이터프레임 생성
+    df = pd.DataFrame(list(product_counts.items()), columns=['상품명', '수량'])
+    
+    # 수량으로 정렬
+    df = df.sort_values('수량', ascending=False)
+    
+    # 엑셀 파일로 저장
+    filename = f'상품집계_{current_date}.xlsx'
+    df.to_excel(filename, index=False)
+    print(f"\n집계 결과가 {filename}에 저장되었습니다.")
+    return filename
+
 def main():
     """메인 프로그램"""
     print("쿠팡 주문서 분석기")
@@ -329,6 +349,7 @@ def main():
     product_counts = analyze_excel_data(file_path)
     if product_counts:
         process_and_display_results(product_counts)
+        save_to_excel(product_counts)
     else:
         print("엑셀 파일 분석 중 오류가 발생했습니다.")
 
