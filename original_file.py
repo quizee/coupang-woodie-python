@@ -288,6 +288,72 @@ def analyze_excel_data(file_path):
         print(f"엑셀 파일 분석 중 오류 발생: {str(e)}")
         return None
 
+def analyze_excel_data_by_buyer(file_path):
+    """
+    엑셀 파일에서 구매자별로 주문 데이터를 분석합니다.
+    """
+    try:
+        # 엑셀 파일 읽기
+        df = pd.read_excel(file_path)
+        
+        # 필요한 열 찾기
+        buyer_name_column = None
+        buyer_phone_column = None
+
+        for col in df.columns:
+            if "구매자" in col and "전화번호" not in col:  # '구매자' 컬럼 찾기, 단 '구매자전화번호'는 제외
+                buyer_name_column = col
+            if "구매자전화번호" in col:
+                buyer_phone_column = col
+
+        if not buyer_phone_column:
+            print("구매자 전화번호 열을 찾을 수 없습니다.")
+            return None
+
+        # 구매자별 상품 수량을 저장할 딕셔너리
+        buyer_product_counts = {}
+        
+        # 구매자별로 그룹화하여 처리
+        for _, row in df.iterrows():
+            # 전화번호는 필수
+            phone = row[buyer_phone_column]
+            if pd.isna(phone):
+                continue
+            
+            # 구매자명이 있으면 사용, 없으면 '고객'으로 표시
+            buyer = row[buyer_name_column] if buyer_name_column and not pd.isna(row[buyer_name_column]) else '고객'
+            
+            # 구매자 키 생성 (구매자명(전화번호) 형식)
+            buyer_key = f"{buyer}({phone})"
+            
+            if buyer_key not in buyer_product_counts:
+                buyer_product_counts[buyer_key] = defaultdict(int)
+            
+            # 현재 행의 데이터만 포함하는 임시 DataFrame 생성
+            temp_df = pd.DataFrame([row])
+            
+            # 임시 파일로 저장했다가 삭제
+            temp_file = f"temp_{phone}.xlsx"
+            temp_df.to_excel(temp_file, index=False)
+            
+            try:
+                # analyze_excel_data 함수를 사용하여 현재 구매자의 주문 분석
+                product_counts = analyze_excel_data(temp_file)
+                if product_counts:
+                    # 기존 상품 수량에 더하기
+                    for product, count in product_counts.items():
+                        buyer_product_counts[buyer_key][product] += count
+            finally:
+                # 임시 파일 삭제
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+        
+        return buyer_product_counts
+        
+    except Exception as e:
+        print(f"엑셀 파일 분석 중 오류 발생: {str(e)}")
+        return None
+
 def process_and_display_results(product_counts, title="쿠팡 주문 분석 결과"):
     """
     분석 결과를 처리하고 화면에 표시합니다.
@@ -313,6 +379,42 @@ def process_and_display_results(product_counts, title="쿠팡 주문 분석 결�
 
     return df
 
+def process_and_display_buyer_results(buyer_product_counts, title="구매자별 주문 분석 결과"):
+    """
+    구매자별 분석 결과를 처리하고 화면에 표시합니다.
+    """
+    if not buyer_product_counts:
+        return None
+
+    print(f"\n{title}")
+    print("=" * 50)
+    
+    # 전체 합계를 계산할 딕셔너리
+    total_counts = defaultdict(int)
+    
+    # 각 구매자별로 결과 출력
+    for buyer, product_counts in buyer_product_counts.items():
+        print(f"\n[구매자: {buyer}]")
+        # 구매자별 데이터프레임 생성 및 출력
+        df = pd.DataFrame(list(product_counts.items()), columns=['상품명', '수량'])
+        df = df.sort_values('상품명')
+        df['수량'] = df['수량'].astype(str) + '개'
+        print(df.to_string(index=False))
+        
+        # 전체 합계에 더하기
+        for product, count in product_counts.items():
+            total_counts[product] += count
+    
+    # 전체 합계 출력
+    print("\n전체 합계")
+    print("=" * 50)
+    total_df = pd.DataFrame(list(total_counts.items()), columns=['상품명', '수량'])
+    total_df = total_df.sort_values('상품명')
+    total_df['수량'] = total_df['수량'].astype(str) + '개'
+    print(total_df.to_string(index=False))
+    
+    return total_df
+
 def save_to_excel(product_counts):
     """
     상품 수량을 엑셀 파일로 저장합니다.
@@ -332,26 +434,82 @@ def save_to_excel(product_counts):
     print(f"\n집계 결과가 {filename}에 저장되었습니다.")
     return filename
 
+def save_buyer_results_to_excel(buyer_product_counts):
+    """
+    구매자별 분석 결과를 엑셀 파일로 저장합니다.
+    """
+    try:
+        # 현재 날짜를 YYYYMMDD 형식으로 가져오기
+        current_date = datetime.now().strftime("%Y%m%d")
+        filename = f'구매자별_상품집계_{current_date}.xlsx'
+        
+        # 모든 데이터를 저장할 리스트
+        all_data = []
+        
+        # 구매자별 데이터 추가
+        for buyer, product_counts in buyer_product_counts.items():
+            for product, count in product_counts.items():
+                all_data.append({
+                    '구매자': buyer,
+                    '상품명': product,
+                    '수량': count
+                })
+        
+        # 전체 합계 계산
+        total_counts = defaultdict(int)
+        for product_counts in buyer_product_counts.values():
+            for product, count in product_counts.items():
+                total_counts[product] += count
+        
+        # 전체 합계 데이터 추가
+        for product, count in total_counts.items():
+            all_data.append({
+                '구매자': '전체 합계',
+                '상품명': product,
+                '수량': count
+            })
+        
+        # 데이터프레임 생성 및 저장
+        df = pd.DataFrame(all_data)
+        df = df.sort_values(['구매자', '수량'], ascending=[True, False])
+        df.to_excel(filename, index=False)
+        
+        print(f"\n구매자별 집계 결과가 {filename}에 저장되었습니다.")
+        return filename
+        
+    except Exception as e:
+        print(f"파일 저장 중 오류 발생: {str(e)}")
+        return None
+
 def main():
     """메인 프로그램"""
     print("쿠팡 주문서 분석기")
     print("=" * 50)
-    print("엑셀 파일을 입력하세요.")
+    print("1. 전체 상품 분석")
+    print("2. 구매자별 상품 분석")
     print("=" * 50)
 
+    choice = input("\n분석 방식을 선택하세요 (1 또는 2): ")
     file_path = input("\n엑셀 파일 경로를 입력하세요: ")
     
     if not os.path.exists(file_path):
         print("파일이 존재하지 않습니다.")
         return
 
-    # 엑셀 파일 분석
-    product_counts = analyze_excel_data(file_path)
-    if product_counts:
-        process_and_display_results(product_counts)
-        save_to_excel(product_counts)
+    if choice == "1":
+        # 기존 방식: 전체 상품 분석
+        product_counts = analyze_excel_data(file_path)
+        if product_counts:
+            process_and_display_results(product_counts)
+            save_to_excel(product_counts)
+    elif choice == "2":
+        # 새로운 방식: 구매자별 분석
+        buyer_product_counts = analyze_excel_data_by_buyer(file_path)
+        if buyer_product_counts:
+            process_and_display_buyer_results(buyer_product_counts)
+            save_buyer_results_to_excel(buyer_product_counts)
     else:
-        print("엑셀 파일 분석 중 오류가 발생했습니다.")
+        print("잘못된 선택입니다.")
 
 if __name__ == "__main__":
     main()
