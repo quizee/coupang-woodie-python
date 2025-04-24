@@ -256,6 +256,12 @@ def analyze_excel_data_by_buyer(file_path):
         # 엑셀 파일 읽기
         df = pd.read_excel(file_path)
 
+        # 디버깅: 실제 열 이름들 출력
+        print("\n=== 엑셀 파일의 열 이름들 ===")
+        for idx, col in enumerate(df.columns):
+            print(f"{idx}번째 열: [{col}]")  # 대괄호로 감싸서 공백도 보이게 함
+        print("=" * 30)
+
         # 필요한 열 찾기
         buyer_name_column = None
         buyer_phone_column = None
@@ -263,17 +269,31 @@ def analyze_excel_data_by_buyer(file_path):
         quantity_column_name = None
 
         for col in df.columns:
-            if "수취인이름" in col:  # '구매자' -> '수취인이름'으로 변경
+            print(f"\n현재 검사중인 열: [{col}]")  # 각 열을 검사할 때마다 출력
+            if "수취인이름" == col:  # 정확한 이름 매칭
                 buyer_name_column = col
-            if "수취인전화번호" in col:  # '구매자전화번호' -> '수취인전화번호'로 변경
+                print(f"수취인이름 열 찾음: [{col}]")
+            if (
+                "수취인전화번호" == col and "통관용" not in col
+            ):  # 정확한 이름 매칭 및 통관용 제외
                 buyer_phone_column = col
-            if "최초등록등록상품명/옵션명" in col:
+                print(f"수취인전화번호 열 찾음: [{col}]")
+            if "최초등록등록상품명/옵션명" == col:  # 정확한 이름 매칭
                 option_column_name = col
-            if "구매수(수량)" in col:
+                print(f"상품명/옵션명 열 찾음: [{col}]")
+            if "구매수(수량)" == col:  # 정확한 이름 매칭
                 quantity_column_name = col
+                print(f"구매수량 열 찾음: [{col}]")
+
+        print("\n=== 열 검색 결과 ===")
+        print(f"수취인이름 열: {buyer_name_column}")
+        print(f"수취인전화번호 열: {buyer_phone_column}")
+        print(f"상품명/옵션명 열: {option_column_name}")
+        print(f"구매수량 열: {quantity_column_name}")
+        print("=" * 30)
 
         if not buyer_phone_column:
-            print("수취인 전화번호 열을 찾을 수 없습니다.")
+            print("수취인전화번호 열을 찾을 수 없습니다.")
             return None
 
         if not option_column_name:
