@@ -121,10 +121,6 @@ def process_option(option, product_counts, quantity_multiplier=1):
     product_name = parts[0].strip()
     quantity_info = parts[1].strip() if len(parts) > 1 else ""
     
-    # 상품명 정규화
-    product_name = normalize_product_name(product_name)
-    
-    print("정규화된 옵션:", option)
     print(f"상품명: {product_name}")
     print(f"수량 정보: {quantity_info}")
     print(f"구매 수량 배수: {quantity_multiplier}")
@@ -299,16 +295,32 @@ def analyze_excel_data_by_buyer(file_path):
         # 필요한 열 찾기
         buyer_name_column = None
         buyer_phone_column = None
+        option_column_name = None
+        quantity_column_name = None
 
         for col in df.columns:
             if "구매자" in col and "전화번호" not in col:  # '구매자' 컬럼 찾기, 단 '구매자전화번호'는 제외
                 buyer_name_column = col
             if "구매자전화번호" in col:
                 buyer_phone_column = col
+            if "최초등록등록상품명/옵션명" in col:
+                option_column_name = col
+            if "구매수(수량)" in col:
+                quantity_column_name = col
 
         if not buyer_phone_column:
             print("구매자 전화번호 열을 찾을 수 없습니다.")
             return None
+
+        if not option_column_name:
+            # 열 이름으로 찾지 못한 경우 15번째 열 사용 (0-based 인덱스, P열)
+            if len(df.columns) > 15:
+                option_column_name = df.columns[15]
+
+        if not quantity_column_name:
+            # 구매수(수량) 열을 찾지 못한 경우 22번째 열 사용 (0-based 인덱스, 22열)
+            if len(df.columns) > 22:
+                quantity_column_name = df.columns[22]
 
         # 구매자별 상품 수량을 저장할 딕셔너리
         buyer_product_counts = {}
@@ -329,24 +341,20 @@ def analyze_excel_data_by_buyer(file_path):
             if buyer_key not in buyer_product_counts:
                 buyer_product_counts[buyer_key] = defaultdict(int)
             
-            # 현재 행의 데이터만 포함하는 임시 DataFrame 생성
-            temp_df = pd.DataFrame([row])
+            # 상품 옵션 정보 처리
+            option = row[option_column_name] if not pd.isna(row[option_column_name]) else ""
             
-            # 임시 파일로 저장했다가 삭제
-            temp_file = f"temp_{phone}.xlsx"
-            temp_df.to_excel(temp_file, index=False)
-            
-            try:
-                # analyze_excel_data 함수를 사용하여 현재 구매자의 주문 분석
-                product_counts = analyze_excel_data(temp_file)
-                if product_counts:
-                    # 기존 상품 수량에 더하기
-                    for product, count in product_counts.items():
-                        buyer_product_counts[buyer_key][product] += count
-            finally:
-                # 임시 파일 삭제
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
+            # 구매수(수량) 가져오기
+            quantity_multiplier = 1
+            if quantity_column_name and not pd.isna(row[quantity_column_name]):
+                try:
+                    quantity_multiplier = int(row[quantity_column_name])
+                except (ValueError, TypeError):
+                    quantity_multiplier = 1
+
+            # 상품 정보 처리
+            if isinstance(option, str) and option:
+                process_option(option, buyer_product_counts[buyer_key], quantity_multiplier)
         
         return buyer_product_counts
         
