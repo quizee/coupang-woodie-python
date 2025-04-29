@@ -284,6 +284,7 @@ def analyze_excel_data_by_buyer(file_path):
         "수취인 주소",
         "최초등록등록상품명/옵션명",
         "구매수(수량)",
+        "주문일",
     ]
     if not all(col in df.columns for col in required_columns):
         print("필수 열이 없습니다. 파일 형식을 확인해주세요.")
@@ -291,7 +292,7 @@ def analyze_excel_data_by_buyer(file_path):
 
     # 수취인별 상품 개수를 저장할 딕셔너리
     buyer_product_counts = {}
-    # 수취인 정보를 저장할 딕셔너리 (주소별로 이름과 전화번호 매핑)
+    # 수취인 정보를 저장할 딕셔너리 (주소별로 이름과 전화번호, 주문일 매핑)
     buyer_info = {}
 
     # 각 행을 순회하면서 처리
@@ -301,6 +302,7 @@ def analyze_excel_data_by_buyer(file_path):
         buyer_address = str(row["수취인 주소"]).strip()
         options = str(row["최초등록등록상품명/옵션명"]).strip()
         quantity_multiplier = int(row["구매수(수량)"])
+        order_date = pd.to_datetime(row["주문일"]).strftime("%Y-%m-%d %H:%M:%S")
 
         # 수취인 주소를 키로 사용
         buyer_key = buyer_address
@@ -308,7 +310,16 @@ def analyze_excel_data_by_buyer(file_path):
         # 새로운 수취인이면 딕셔너리 초기화
         if buyer_key not in buyer_product_counts:
             buyer_product_counts[buyer_key] = defaultdict(int)
-            buyer_info[buyer_key] = {"name": buyer_name, "phone": buyer_phone}
+            buyer_info[buyer_key] = {
+                "name": buyer_name,
+                "phone": buyer_phone,
+                "order_date": order_date,
+            }
+        else:
+            # 기존 수취인의 경우 더 빠른 주문일로 업데이트
+            current_date = buyer_info[buyer_key]["order_date"]
+            if order_date < current_date:
+                buyer_info[buyer_key]["order_date"] = order_date
 
         # 옵션 정보가 여러 줄일 경우 각각 처리
         for option in options.split("\n"):
@@ -431,6 +442,7 @@ def save_buyer_results_to_excel(buyer_product_counts, buyer_info):
         buyer_name = buyer_info[buyer_key]["name"]
         buyer_phone = buyer_info[buyer_key]["phone"]
         buyer_address = buyer_key  # 주소가 키로 사용됨
+        order_date = buyer_info[buyer_key]["order_date"]
 
         # 주문내역 문자열 생성
         order_details = []
@@ -445,11 +457,12 @@ def save_buyer_results_to_excel(buyer_product_counts, buyer_info):
                 "수취인전화번호": buyer_phone,
                 "수취인 주소": buyer_address,
                 "주문건": order_text,
+                "주문일": order_date,
             }
         )
 
-    # 주문건 기준으로 정렬
-    results.sort(key=lambda x: x["주문건"], reverse=True)
+    # 주문일 기준으로 정렬
+    results.sort(key=lambda x: x["주문일"])
 
     # 결과를 엑셀 파일로 저장
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -457,6 +470,8 @@ def save_buyer_results_to_excel(buyer_product_counts, buyer_info):
 
     try:
         df = pd.DataFrame(results)
+        # 주문일 컬럼 제거 (표시용으로만 사용)
+        df = df[["수취인이름", "수취인전화번호", "수취인 주소", "주문건"]]
         df.to_excel(excel_filename, index=False, engine="openpyxl")
         print(f"\n분석 결과가 {excel_filename} 파일로 저장되었습니다.")
     except Exception as e:

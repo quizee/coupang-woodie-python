@@ -151,20 +151,25 @@ class CoupangAnalyzerGUI(QMainWindow):
                 )
                 if self.buyer_product_counts:
                     # 테이블 컬럼 설정
-                    self.result_table.setColumnCount(4)
+                    self.result_table.setColumnCount(5)
                     self.result_table.setHorizontalHeaderLabels(
-                        ["수취인이름", "수취인전화번호", "수취인 주소", "주문건"]
+                        [
+                            "수취인이름",
+                            "수취인전화번호",
+                            "수취인 주소",
+                            "주문건",
+                            "주문일",
+                        ]
                     )
 
-                    # 결과를 테이블에 표시
+                    # 결과를 리스트로 변환하여 정렬
+                    results = []
                     for buyer_key, product_counts in self.buyer_product_counts.items():
-                        row_position = self.result_table.rowCount()
-                        self.result_table.insertRow(row_position)
-
                         # 구매자 정보 가져오기
                         buyer_name = self.buyer_info[buyer_key]["name"]
                         buyer_phone = self.buyer_info[buyer_key]["phone"]
                         buyer_address = buyer_key  # 주소가 키로 사용됨
+                        order_date = self.buyer_info[buyer_key]["order_date"]
 
                         # 주문내역 문자열 생성
                         order_details = []
@@ -172,17 +177,37 @@ class CoupangAnalyzerGUI(QMainWindow):
                             order_details.append(f"{product} {count}개")
                         order_text = " / ".join(order_details)
 
+                        results.append(
+                            {
+                                "name": buyer_name,
+                                "phone": buyer_phone,
+                                "address": buyer_address,
+                                "order": order_text,
+                                "date": order_date,
+                            }
+                        )
+
+                    # 주문일 기준으로 정렬
+                    results.sort(key=lambda x: x["date"])
+
+                    # 정렬된 결과를 테이블에 표시
+                    for result in results:
+                        row_position = self.result_table.rowCount()
+                        self.result_table.insertRow(row_position)
                         self.result_table.setItem(
-                            row_position, 0, QTableWidgetItem(buyer_name)
+                            row_position, 0, QTableWidgetItem(result["name"])
                         )
                         self.result_table.setItem(
-                            row_position, 1, QTableWidgetItem(buyer_phone)
+                            row_position, 1, QTableWidgetItem(result["phone"])
                         )
                         self.result_table.setItem(
-                            row_position, 2, QTableWidgetItem(buyer_address)
+                            row_position, 2, QTableWidgetItem(result["address"])
                         )
                         self.result_table.setItem(
-                            row_position, 3, QTableWidgetItem(order_text)
+                            row_position, 3, QTableWidgetItem(result["order"])
+                        )
+                        self.result_table.setItem(
+                            row_position, 4, QTableWidgetItem(result["date"])
                         )
 
                     self.status_label.setText("분석이 완료되었습니다.")
@@ -228,6 +253,7 @@ class CoupangAnalyzerGUI(QMainWindow):
                         buyer_name = self.buyer_info[buyer_key]["name"]
                         buyer_phone = self.buyer_info[buyer_key]["phone"]
                         buyer_address = buyer_key  # 주소가 키로 사용됨
+                        order_date = self.buyer_info[buyer_key]["order_date"]
 
                         # 주문내역 문자열 생성
                         order_details = []
@@ -241,11 +267,13 @@ class CoupangAnalyzerGUI(QMainWindow):
                                 "수취인전화번호": buyer_phone,
                                 "수취인 주소": buyer_address,
                                 "주문건": order_text,
+                                "주문일": order_date,
                             }
                         )
 
                     df = pd.DataFrame(all_data)
-                    df = df.sort_values("수취인이름")
+                    # 주문일 기준으로 정렬
+                    df = df.sort_values("주문일")
                     df.to_excel(file_name, index=False)
 
             if file_name:
