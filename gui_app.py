@@ -146,14 +146,14 @@ class CoupangAnalyzerGUI(QMainWindow):
                     self.excel_download_btn.setEnabled(False)
             else:
                 # 구매자별 분석
-                self.buyer_product_counts = analyze_excel_data_by_buyer(
-                    self.selected_file
+                self.buyer_product_counts, self.buyer_info = (
+                    analyze_excel_data_by_buyer(self.selected_file)
                 )
                 if self.buyer_product_counts:
                     # 테이블 컬럼 설정
-                    self.result_table.setColumnCount(3)
+                    self.result_table.setColumnCount(4)
                     self.result_table.setHorizontalHeaderLabels(
-                        ["수취인", "수취인전화번호", "주문건"]
+                        ["수취인이름", "수취인전화번호", "수취인 주소", "주문건"]
                     )
 
                     # 결과를 테이블에 표시
@@ -161,9 +161,10 @@ class CoupangAnalyzerGUI(QMainWindow):
                         row_position = self.result_table.rowCount()
                         self.result_table.insertRow(row_position)
 
-                        # 구매자 정보 분리 (이름과 전화번호)
-                        buyer_name = buyer_key.split("(")[0]
-                        buyer_phone = buyer_key.split("(")[1].rstrip(")")
+                        # 구매자 정보 가져오기
+                        buyer_name = self.buyer_info[buyer_key]["name"]
+                        buyer_phone = self.buyer_info[buyer_key]["phone"]
+                        buyer_address = buyer_key  # 주소가 키로 사용됨
 
                         # 주문내역 문자열 생성
                         order_details = []
@@ -178,7 +179,10 @@ class CoupangAnalyzerGUI(QMainWindow):
                             row_position, 1, QTableWidgetItem(buyer_phone)
                         )
                         self.result_table.setItem(
-                            row_position, 2, QTableWidgetItem(order_text)
+                            row_position, 2, QTableWidgetItem(buyer_address)
+                        )
+                        self.result_table.setItem(
+                            row_position, 3, QTableWidgetItem(order_text)
                         )
 
                     self.status_label.setText("분석이 완료되었습니다.")
@@ -220,9 +224,10 @@ class CoupangAnalyzerGUI(QMainWindow):
                 if file_name and self.buyer_product_counts:
                     all_data = []
                     for buyer_key, product_counts in self.buyer_product_counts.items():
-                        # 구매자 정보 분리
-                        buyer_name = buyer_key.split("(")[0]
-                        buyer_phone = buyer_key.split("(")[1].rstrip(")")
+                        # 구매자 정보 가져오기
+                        buyer_name = self.buyer_info[buyer_key]["name"]
+                        buyer_phone = self.buyer_info[buyer_key]["phone"]
+                        buyer_address = buyer_key  # 주소가 키로 사용됨
 
                         # 주문내역 문자열 생성
                         order_details = []
@@ -232,14 +237,15 @@ class CoupangAnalyzerGUI(QMainWindow):
 
                         all_data.append(
                             {
-                                "수취인": buyer_name,
+                                "수취인이름": buyer_name,
                                 "수취인전화번호": buyer_phone,
+                                "수취인 주소": buyer_address,
                                 "주문건": order_text,
                             }
                         )
 
                     df = pd.DataFrame(all_data)
-                    df = df.sort_values("수취인")
+                    df = df.sort_values("수취인이름")
                     df.to_excel(file_name, index=False)
 
             if file_name:
