@@ -52,7 +52,9 @@ def normalize_product_name(name):
     return name
 
 
-def process_option(option, product_counts, quantity_multiplier=1):
+def process_option(
+    option, product_counts, quantity_multiplier=1, is_buyer_analysis=False
+):
     """
     개별 옵션 정보를 처리하여 상품명과 수량을 추출합니다.
     """
@@ -91,35 +93,51 @@ def process_option(option, product_counts, quantity_multiplier=1):
             print(f"  - {flavor} +{quantity_multiplier}개 추가")
         return
 
-    # 상품명 정규화
-    product_name = normalize_product_name(product_name)
-
-    # 케이스 1: "10개 올리브치아바타 10개입" -> 치아바타 종류별 처리
-    chiabatta_pattern = r"(\d+)개\s+([가-힣]+)(?:\s*치아바타)"
-    chiabatta_matches = re.findall(chiabatta_pattern, quantity_info)
-    if chiabatta_matches:
-        print("치아바타 종류별 처리:")
-        for quantity, chiabatta_type in chiabatta_matches:
-            normalized_name = f"{normalize_product_name(chiabatta_type)}치아바타"
-            product_counts[normalized_name] += int(quantity) * quantity_multiplier
-            print(
-                f"  - {normalized_name} +{int(quantity) * quantity_multiplier}개 추가"
-            )
+    # 치아바타 10개입 세트인 경우
+    if "치아바타 10개입 세트" in product_name:
+        if is_buyer_analysis:
+            # 수취인별 분석일 때는 전체 옵션을 상품명으로 사용
+            print("치아바타 10개입 세트 처리 (수취인별 분석):")
+            product_counts[option] += quantity_multiplier
+            print(f"  - {option} +{quantity_multiplier}개 추가")
+        else:
+            # 케이스 1: "10개 올리브치아바타 10개입" -> 치아바타 종류별 처리
+            chiabatta_pattern = r"(\d+)개\s+([가-힣]+)(?:\s*치아바타)"
+            chiabatta_matches = re.findall(chiabatta_pattern, quantity_info)
+            if chiabatta_matches:
+                print("치아바타 종류별 처리:")
+                for quantity, chiabatta_type in chiabatta_matches:
+                    normalized_name = (
+                        f"{normalize_product_name(chiabatta_type)}치아바타"
+                    )
+                    product_counts[normalized_name] += (
+                        int(quantity) * quantity_multiplier
+                    )
+                    print(
+                        f"  - {normalized_name} +{int(quantity) * quantity_multiplier}개 추가"
+                    )
+                return
+            # 케이스 4: "올리브치아바타 5개 + 치즈치아바타 5개" -> 치아바타 종류별 처리
+            if "+" in quantity_info:
+                print("치아바타 조합 패턴 처리:")
+                chiabatta_pattern = r"([가-힣]+)(?:\s*치아바타)\s*(\d+)개"
+                chiabatta_matches = re.findall(chiabatta_pattern, quantity_info)
+                if chiabatta_matches:
+                    for chiabatta_type, quantity in chiabatta_matches:
+                        normalized_name = (
+                            f"{normalize_product_name(chiabatta_type)}치아바타"
+                        )
+                        product_counts[normalized_name] += (
+                            int(quantity) * quantity_multiplier
+                        )
+                        print(
+                            f"  - {normalized_name} +{int(quantity) * quantity_multiplier}개 추가"
+                        )
+                    return
         return
 
-    # 케이스 4: "올리브치아바타 5개 + 치즈치아바타 5개" -> 치아바타 종류별 처리
-    if "+" in quantity_info:
-        print("치아바타 조합 패턴 처리:")
-        chiabatta_pattern = r"([가-힣]+)(?:\s*치아바타)\s*(\d+)개"
-        chiabatta_matches = re.findall(chiabatta_pattern, quantity_info)
-        if chiabatta_matches:
-            for chiabatta_type, quantity in chiabatta_matches:
-                normalized_name = f"{normalize_product_name(chiabatta_type)}치아바타"
-                product_counts[normalized_name] += int(quantity) * quantity_multiplier
-                print(
-                    f"  - {normalized_name} +{int(quantity) * quantity_multiplier}개 추가"
-                )
-            return
+    # 상품명 정규화
+    product_name = normalize_product_name(product_name)
 
     # 케이스 5: "100g 1개 옵션명" -> 옵션명 추출
     option_name_match = re.search(
@@ -345,7 +363,7 @@ def analyze_excel_data_by_buyer(file_path):
             # 상품 정보 처리
             if isinstance(option, str) and option:
                 process_option(
-                    option, buyer_product_counts[buyer_key], quantity_multiplier
+                    option, buyer_product_counts[buyer_key], quantity_multiplier, True
                 )
 
         return buyer_product_counts
